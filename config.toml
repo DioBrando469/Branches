@@ -1,7 +1,7 @@
 # config.toml
 package_name = "requests"
 repo_url_or_path = "https://github.com/psf/requests"
-repo_mode = "url" # Valid values: "url", "local_file"
+repo_mode = "url" # "url" or "local_file"
 output_image_name = "dependency_graph.png"
 max_depth = 3
 filter_substring = "py"
