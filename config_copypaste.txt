@@ -1,0 +1,39 @@
+# config.toml
+package_name = "requests"
+repo_url_or_path = "https://github.com/psf/requests"
+repo_mode = "url"
+output_image_name = "requests_graph.png"
+max_depth = 1
+filter_substring = ""
+show_download_order = true
+plantuml_output_file = "requests_graph.puml"
+
+# config.toml
+package_name = "FLASK"
+repo_url_or_path = "test_flask.txt"
+repo_mode = "test"
+output_image_name = "dependency_graph.png"
+max_depth = 5
+filter_substring = ""
+show_download_order = true
+plantuml_output_file = "dependency_graph.puml"
+
+# config.toml
+package_name = "PANDAS"
+repo_url_or_path = "test_pandas.txt"
+repo_mode = "test"
+output_image_name = "dependency_graph.png"
+max_depth = 5
+filter_substring = ""
+show_download_order = true
+plantuml_output_file = "dependency_graph.puml"
+
+# config.toml
+package_name = "CORE"
+repo_url_or_path = "test_complex.txt"
+repo_mode = "test"
+output_image_name = "dependency_graph.png"
+max_depth = 5
+filter_substring = ""
+show_download_order = true
+plantuml_output_file = "dependency_graph.puml"
