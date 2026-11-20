@@ -1,7 +1,7 @@
 # config.toml
-package_name = "requests"
-repo_url_or_path = "https://github.com/psf/requests"
-repo_mode = "url" # "url" or "local_file"
+package_name = "A"
+repo_url_or_path = "test_graph.txt" # Path to the test file
+repo_mode = "test"                  # Changed to "test"
 output_image_name = "dependency_graph.png"
 max_depth = 3
-filter_substring = "py"
+filter_substring = "E"              # 'E' will be filtered out
