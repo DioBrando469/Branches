@@ -1,7 +1,8 @@
 # config.toml
 package_name = "A"
-repo_url_or_path = "test_graph.txt" # Path to the test file
-repo_mode = "test"                  # Changed to "test"
+repo_url_or_path = "test_dag.txt" # We'll create this DAG test file
+repo_mode = "test"
 output_image_name = "dependency_graph.png"
-max_depth = 3
-filter_substring = "E"              # 'E' will be filtered out
+max_depth = 5
+filter_substring = ""
+show_download_order = true
