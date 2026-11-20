@@ -7,7 +7,7 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Dict, Any, List, Optional, Set, Tuple
+from typing import Dict, Any, List, Optional, Set
 
 # Standard library TOML parser
 try:
@@ -61,8 +61,7 @@ def load_config(file_path: Path) -> Config:
     if not file_path.exists(): raise FileNotFoundError(f"Configuration file not found: {file_path}")
     with open(file_path, "rb") as f: return validate_config(tomllib.load(f))
 
-# --- STAGE 2: DATA COLLECTION (Standard Library Only) ---
-
+# --- STAGE 2: DATA COLLECTION ---
 def fetch_content_from_github(repo_url: str, filename: str) -> Optional[str]:
     if "github.com" not in repo_url: return None
     for branch in ["main", "master"]:
@@ -110,7 +109,6 @@ def parse_requirements_txt(content: str) -> List[str]:
     return [line.split(" #")[0].strip() for line in content.splitlines() if line.strip() and not line.startswith("#")]
 
 # --- STAGE 3 & 4: GRAPH BUILDING & TOPOLOGICAL SORT ---
-
 def get_dependencies_for_package(pkg_name: str, config: Config, test_data: Optional[Dict[str, List[str]]]) -> List[str]:
     if config.repo_mode == "test" and test_data is not None:
         return test_data.get(pkg_name, [])
@@ -142,8 +140,9 @@ def build_graph_dfs(pkg_name: str, current_depth: int, config: Config, test_data
         graph[pkg_name].append(dep)
         build_graph_dfs(dep, current_depth + 1, config, test_data, graph, visited)
 
-def load_test_data(file_path: str) -> Dict[str, List[str]]:
+def load_test_data(file_path: Path) -> Dict[str, List[str]]:
     data = {}
+    if not file_path.exists(): raise FileNotFoundError(f"Test data file not found: {file_path}")
     with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
             if ":" in line:
@@ -162,8 +161,7 @@ def get_download_order(graph: Dict[str, List[str]]) -> List[str]:
     for node in graph: dfs(node)
     return order
 
-# --- STAGE 5: VISUALIZATION (Pillow + PlantUML) ---
-
+# --- STAGE 5: VISUALIZATION ---
 def generate_plantuml(graph: Dict[str, List[str]], filename: str):
     lines = ["@startuml", "skinparam linetype ortho", "left to right direction"]
     for pkg, deps in graph.items():
@@ -173,27 +171,20 @@ def generate_plantuml(graph: Dict[str, List[str]], filename: str):
     print(f"[+] PlantUML text saved to: {filename}")
 
 def generate_png(graph: Dict[str, List[str]], filename: str):
-    """Generates a PNG image using Pillow with a simple hierarchical layout."""
     if not graph:
         print("[-] Graph is empty, skipping PNG generation.")
         return
 
-    # Layout calculations
     node_width, node_height = 140, 40
     x_spacing, y_spacing = 50, 80
-    
-    # Calculate node positions (simple level-based layout)
     positions = {}
-    level_y = {}
     
-    # Root is the node with no incoming edges
     all_deps = {dep for deps in graph.values() for dep in deps}
     root = [node for node in graph if node not in all_deps][0] if [node for node in graph if node not in all_deps] else list(graph.keys())[0]
     
     def assign_pos(node, level, x_offset):
         if node in positions: return x_offset
         positions[node] = (x_offset, level * y_spacing)
-        level_y[level] = max(level_y.get(level, 0), x_offset)
         current_x = x_offset
         for dep in graph.get(node, []):
             current_x = assign_pos(dep, level + 1, current_x)
@@ -201,31 +192,24 @@ def generate_png(graph: Dict[str, List[str]], filename: str):
 
     assign_pos(root, 0, 50)
     
-    # Calculate image size
     max_x = max([p[0] for p in positions.values()]) + node_width + 50
     max_y = max([p[1] for p in positions.values()]) + node_height + 50
     
     img = Image.new("RGB", (max_x, max_y), "white")
     draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 14)
-    except IOError:
-        font = ImageFont.load_default()
+    try: font = ImageFont.truetype("arial.ttf", 14)
+    except IOError: font = ImageFont.load_default()
 
-    # Draw edges
     for pkg, deps in graph.items():
         if pkg not in positions: continue
         x1, y1 = positions[pkg]
         for dep in deps:
             if dep not in positions: continue
             x2, y2 = positions[dep]
-            # Draw line from bottom of pkg to top of dep
             draw.line([(x1 + node_width//2, y1 + node_height), (x2 + node_width//2, y2)], fill="gray", width=2)
             
-    # Draw nodes
     for node, (x, y) in positions.items():
         draw.rectangle([x, y, x + node_width, y + node_height], fill="lightblue", outline="black", width=2)
-        # Center text
         bbox = draw.textbbox((0, 0), node, font=font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
@@ -237,19 +221,44 @@ def generate_png(graph: Dict[str, List[str]], filename: str):
 # --- MAIN EXECUTION ---
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config.toml")
+    parser.add_argument("--config", type=str, default="tests/config.toml")
     args = parser.parse_args()
 
-    try: config = load_config(Path(args.config))
-    except Exception as e: print(f"Config Error: {e}", file=sys.stderr); sys.exit(1)
+    # --- SMART PATH RESOLUTION ---
+    config_path = Path(args.config)
+    
+    # If the path doesn't exist from the current working directory, try finding it relative to the project root
+    if not config_path.exists():
+        script_dir = Path(__file__).resolve().parent
+        project_root = script_dir.parent
+        
+        if (project_root / args.config).exists():
+            config_path = project_root / args.config
+        # Look specifically in the "tests" folder
+        elif (project_root / "tests" / config_path.name).exists():
+            config_path = project_root / "tests" / config_path.name
 
-    test_data = load_test_data(config.repo_url_or_path) if config.repo_mode == "test" else None
+    try: 
+        config = load_config(config_path)
+    except Exception as e: 
+        print(f"Config Error: {e}", file=sys.stderr)
+        print(f"Looked for config at: {config_path.absolute()}", file=sys.stderr)
+        sys.exit(1)
+
+    test_data = None
+    if config.repo_mode == "test":
+        # Resolve the test file relative to the CONFIG file's folder
+        test_file_path = config_path.parent / config.repo_url_or_path
+        test_data = load_test_data(test_file_path)
+
     graph, visited = {}, set()
 
-    print(f"Analyzing {config.package_name}...")
+    print(f"--- Running Visualization Tool (Mode: {config.repo_mode}) ---")
+    print(f"Analyzing {config.package_name}...\n")
+    
     build_graph_dfs(config.package_name, 0, config, test_data, graph, visited)
 
-    print("\n--- Graph Data ---")
+    print("--- Graph Data ---")
     for pkg, deps in graph.items(): print(f"{pkg} -> {deps}")
 
     if config.show_download_order:
